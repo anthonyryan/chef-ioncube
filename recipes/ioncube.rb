@@ -1,6 +1,6 @@
 #
 # Author:: anthony ryan <anthony@tentric.com>
-# Cookbook Name:: server
+# Cookbook Name:: ioncube
 #
 # Copyright 2014, Anthony Ryan
 #
@@ -18,35 +18,33 @@
 #
 
 # install ioncube from source
-ioncube_src_url = "#{node['server']['ioncubesrc_url']}/#{node['server']['ioncubefile']}"
+ioncube_src_url = "#{node['ioncube']['ioncubesrc_url']}/#{node['ioncube']['ioncubefile']}"
 
 # download the file
-remote_file "/tmp/#{node['server']['ioncubefile']}" do
+remote_file "/tmp/#{node['ioncube']['ioncubefile']}" do
   source ioncube_src_url
   mode 0644
   action :create_if_missing
   ignore_failure true
-  not_if "test -f /tmp/#{node['server']['ioncubefile']}"
+  not_if "test -f /tmp/#{node['ioncube']['ioncubefile']}"
 end
 
 # untar it
-execute "tar --no-same-owner -zxvf #{node['server']['ioncubefile']}" do
+execute "tar --no-same-owner -zxvf #{node['ioncube']['ioncubefile']}" do
   cwd "/tmp"
 end
 
 # create default ioncube directory
-directory "#{node['server']['ioncubedir']}" do
+directory "#{node['ioncube']['ioncubedir']}" do
   mode 0755
   action :create
-  not_if do
-      Dir.exists?("#{node['server']['ioncubedir']}")
-  end
+  not_if { ::Dir.exists?("#{node['ioncube']['ioncubedir']}") }
 end
 
 # move ioncube files to proper directory
 execute "ioncube install" do
   environment({"PATH" => "/usr/local/bin:/usr/bin:/bin:$PATH"})
-  command "mv ioncube_loader_*5*.so #{node['server']['ioncubedir']}"
+  command "mv ioncube_loader_*5*.so #{node['ioncube']['ioncubedir']}"
   cwd "/tmp/ioncube"
   ignore_failure true
 end
@@ -54,36 +52,39 @@ end
 # symlink ioncube version to php directory
 if platform?('debian', 'ubuntu')
   link "/usr/lib/php5/20121212/ioncube_loader.so" do
-    to "#{node['server']['ioncubedir']}/ioncube_loader_#{node['server']['ioncubeversion']}.so"
+    to "#{node['ioncube']['ioncubedir']}/ioncube_loader_#{node['ioncube']['ioncubeversion']}.so"
     ignore_failure true
-    only_if do
-      Dir.exists?("/usr/lib/php5")
-    end
+    only_if { ::Dir.exists?("/usr/lib/php5") }
   end
 end
 
 # install ioncube module loader
 if platform?('debian', 'ubuntu')
-  template "#{node[:server][:phpdir]}/mods-available/00-ioncube.ini" do
+  template "#{node[:ioncube][:phpdir]}/mods-available/ioncube.ini" do
     source 'ioncube.ini.erb'
     ignore_failure true
-    only_if do
-      Dir.exists?("#{node[:server][:phpdir]}")
-    end
+    only_if { ::Dir.exists?("#{node[:ioncube][:phpdir]}") }
   end
-  link "#{node[:server][:phpdir]}/apache2/conf.d/00-ioncube.ini" do
-    to "#{node[:server][:phpdir]}/mods-available/00-ioncube.ini"
+#  link "#{node[:ioncube][:phpdir]}/apache2/conf.d/ioncube.ini" do
+#    to "#{node[:ioncube][:phpdir]}/mods-available/ioncube.ini"
+#    ignore_failure true
+#    only_if { ::Dir.exists?("#{node[:ioncube][:phpdir]}") }
+#  end
+#  link "#{node[:ioncube][:phpdir]}/cli/conf.d/ioncube.ini" do
+#    to "#{node[:ioncube][:phpdir]}/mods-available/ioncube.ini"
+#    ignore_failure true
+#    only_if { ::Dir.exists?("#{node[:ioncube][:phpdir]}") }
+#  end
+end
+
+# enable ioncube php module
+if platform?('debian', 'ubuntu')
+  execute "ioncube php module enable" do
+    environment({"PATH" => "/usr/local/bin:/usr/bin:/bin:/usr/sbin:$PATH"})
+    command "/usr/sbin/php5enmod ioncube"
     ignore_failure true
-    only_if do
-      Dir.exists?("#{node[:server][:phpdir]}")
-    end
-  end
-  link "#{node[:server][:phpdir]}/cli/conf.d/00-ioncube.ini" do
-    to "#{node[:server][:phpdir]}/mods-available/00-ioncube.ini"
-    ignore_failure true
-    only_if do
-      Dir.exists?("#{node[:server][:phpdir]}")
-    end
+    only_if { ::Dir.glob("#{node[:ioncube][:phpdir]}/apache2/conf.d/*ioncube.ini").any? }
+    only_if { ::File.exists?("/usr/sbin/php5enmod") }
   end
 end
 

@@ -49,43 +49,42 @@ execute "ioncube install" do
   ignore_failure true
 end
 
-# symlink ioncube version to php directory
 if platform?('debian', 'ubuntu')
+  # symlink ioncube version to php directory
   link "/usr/lib/php5/20121212/ioncube_loader.so" do
     to "#{node['ioncube']['ioncubedir']}/ioncube_loader_#{node['ioncube']['ioncubeversion']}.so"
     ignore_failure true
     only_if { ::Dir.exists?("/usr/lib/php5") }
   end
-end
-
-# install ioncube module loader
-if platform?('debian', 'ubuntu')
+  
   template "#{node[:ioncube][:phpdir]}/mods-available/ioncube.ini" do
     source 'ioncube.ini.erb'
     ignore_failure true
     only_if { ::Dir.exists?("#{node[:ioncube][:phpdir]}") }
   end
-#  link "#{node[:ioncube][:phpdir]}/apache2/conf.d/ioncube.ini" do
-#    to "#{node[:ioncube][:phpdir]}/mods-available/ioncube.ini"
-#    ignore_failure true
-#    only_if { ::Dir.exists?("#{node[:ioncube][:phpdir]}") }
-#  end
-#  link "#{node[:ioncube][:phpdir]}/cli/conf.d/ioncube.ini" do
-#    to "#{node[:ioncube][:phpdir]}/mods-available/ioncube.ini"
-#    ignore_failure true
-#    only_if { ::Dir.exists?("#{node[:ioncube][:phpdir]}") }
-#  end
-end
 
-# enable ioncube php module
-if platform?('debian', 'ubuntu')
-  execute "ioncube php module enable" do
-    environment({"PATH" => "/usr/local/bin:/usr/bin:/bin:/usr/sbin:$PATH"})
-    command "/usr/sbin/php5enmod ioncube"
-    ignore_failure true
-    only_if { ::Dir.glob("#{node[:ioncube][:phpdir]}/apache2/conf.d/*ioncube.ini").any? }
-    only_if { ::File.exists?("/usr/sbin/php5enmod") }
+  # do we manually symlink or use php5enmod ?
+  if ::File.exists?("/usr/sbin/php5enmod")
+    # enable ioncube php module
+    # todo: add notify delay here so that it calls execute after everything else
+    execute "ioncube php module enable" do
+      environment({"PATH" => "/usr/local/bin:/usr/bin:/bin:/usr/sbin:$PATH"})
+      command "/usr/sbin/php5enmod ioncube"
+      ignore_failure true
+      only_if { ::File.exists?("#{node[:ioncube][:phpdir]}/mods-available/ioncube.ini") }
+    end
+  else
+    # symlink manually
+    %w(apache2 cli fpm).each do |process|
+      link "#{node[:ioncube][:phpdir]}/#{process}/conf.d/ioncube.ini" do
+        to "#{node[:ioncube][:phpdir]}/mods-available/ioncube.ini"
+        ignore_failure true
+        only_if { ::Dir.exists?("#{node[:ioncube][:phpdir]}/#{process}") }
+      end
+    end
   end
+
+# todo: redhat/amazon install ref
 end
 
 # clean up install path

@@ -76,7 +76,7 @@ if platform?('debian', 'ubuntu')
   else
     # symlink manually
     %w(apache2 cli fpm).each do |process|
-      link "#{node[:ioncube][:phpdir]}/#{process}/conf.d/ioncube.ini" do
+      link "#{node[:ioncube][:phpdir]}/#{process}/conf.d/01-ioncube.ini" do
         to "#{node[:ioncube][:phpdir]}/mods-available/ioncube.ini"
         ignore_failure true
         only_if { ::Dir.exists?("#{node[:ioncube][:phpdir]}/#{process}") }
